@@ -236,7 +236,7 @@ Resources:
           #!/bin/bash -ex 
           yum update -y
           yum install httpd -y
-          echo "<html> <h1>This is a test :D </h1> </html>" > /var/www/html/index.html
+          echo "<html> <h1> This is a test :D </h1> </html>" > /var/www/html/index.html
           service httpd start
           chkconfig --add httpd
 
@@ -300,7 +300,6 @@ Resources:
       VPCZoneIdentifier:
         - !Ref PrivateSubnet1
         - !Ref PrivateSubnet2
-        # - !Join [“, ”, [!Ref PrivateSubnet1, !Ref PrivateSubnet2]]
       TargetGroupARNs:
         - !Ref myTargetGroup
       Tags:
