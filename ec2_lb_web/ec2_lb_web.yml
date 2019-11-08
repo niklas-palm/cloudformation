@@ -224,7 +224,7 @@ Resources:
     Properties:
       AssociatePublicIpAddress: false # Since not default subnet, default is false
       # IamInstanceProfile:
-      ImageId: ami-028188d9b49b32a80 # Amazon Linux AMI in Ireland
+      ImageId: ami-028188d9b49b32a80 # Amazon Linux AMI in Ireland -  nov '19'
       # EbsOptimized: true|false
       # InstanceMonitoring: true|false
       InstanceType: t2.micro
