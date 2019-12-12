@@ -26,7 +26,7 @@ Simply navigate to CloudFormation in AWS console and create a new stack from a t
 
 ## Samples
 
-All the samples in this repo is using AMIs in the Ireland region.
+All the samples in this repo are using AMIs from Oktober 2019, so manual update of the relevant AMIs in the mappings may be needed.
 
 ### /ec2_lb_web
 
