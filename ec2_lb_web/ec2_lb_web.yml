@@ -7,8 +7,40 @@
 #     Description: Amazon EC2 Key Pair
 #     Type: AWS::EC2::KeyPair::KeyName
 
-# Mappings:
-
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMALINUX: ami-0080e4c5bc078760e
+    us-east-2:
+      AMALINUX: ami-0cd3dfa4e37921605
+    us-west-1:
+      AMALINUX: ami-0ec6517f6edbf8044
+    us-west-2:
+      AMALINUX: ami-01e24be29428c15b2
+    sa-east-1:
+      AMALINUX: ami-05145e0b28ad8e0b2
+    ca-central-1:
+      AMALINUX: ami-07423fb63ea0a0930
+    eu-west-1:
+      AMALINUX: ami-01f14919ba412de34
+    eu-west-2:
+      AMALINUX: ami-01419b804382064e4
+    eu-west-3:
+      AMALINUX: ami-0dd7e7ed60da8fb83
+    eu-central-1:
+      AMALINUX: ami-0cfbf4f6db41068ac
+    ap-southeast-1:
+      AMALINUX: ami-05b3bcf7f311194b3
+    ap-southeast-2:
+      AMALINUX: ami-02fd0b06f06d93dfc
+    ap-northeast-1:
+      AMALINUX: ami-00a5245b4816c38e6
+    ap-northeast-2:
+      AMALINUX: ami-00dc207f8ba6dc919
+    ap-south-1:
+      AMALINUX: ami-0ad42f4f66f6c1cc9
+    cn-north-1:
+      AMALINUX: ami-8e6aa0e3
 # Conditions:
 
 Resources:
@@ -222,7 +254,8 @@ Resources:
     Properties:
       AssociatePublicIpAddress: false # Since not default subnet, default is false
       # IamInstanceProfile:
-      ImageId: ami-028188d9b49b32a80 # Amazon Linux AMI in Ireland -  nov '19'
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMALINUX]
+      # ImageId: ami-028188d9b49b32a80 # Amazon Linux AMI in Ireland -  nov '19'
       # EbsOptimized: true|false
       # InstanceMonitoring: true|false
       InstanceType: t2.micro
