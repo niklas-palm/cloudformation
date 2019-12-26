@@ -339,7 +339,7 @@ Resources:
 
 Outputs:
   ALBDNS:
-    Description: The Public DNS for Application Load Balancer
+    Description: The Public DNS for the Application Load Balancer
     Value: !GetAtt
       - ALB
       - DNSName
