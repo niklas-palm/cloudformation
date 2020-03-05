@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  DynamoDB Streams Lambda trigger
+
+  SAM Template for testing triggering a lambda with DyamoDB Streams
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 10
+
+Resources:
+  DynamoTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES # Different options: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-dynamodb-streamspecification.html#cfn-dynamodb-streamspecification-streamviewtype
+
+  DynamoStreamsFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: dynamo-streams-function/
+      Handler: app.lambdaHandler
+      Runtime: nodejs12.x
+
+      Events:
+        StreamTrigger:
+          Type: DynamoDB
+          Properties:
+            BatchSize: 1 # default = 100. Buffer messages until size is BatchSize
+            MaximumBatchingWindowInSeconds: 60 # Maximum number of seconds to wait before invoking the function
+            # MaximumRecordAgeInSeconds: 60 # The maximum age of a record that Lambda sends to a function for processing.
+            # Enabled: Bool # To enable smooth on / off. maps to the AWS::Lambda::EventSourceMapping Enabled property
+            StartingPosition: TRIM_HORIZON # || LATEST # The position in a stream from which to start reading.
+            Stream: !GetAtt DynamoTable.StreamArn # Stream ARN
+Outputs:
+  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+  DynamoStreamsFunction:
+    Description: "DynamoStreamsFunction Function ARN"
+    Value: !GetAtt DynamoStreamsFunction.Arn
+  DynamoDbTable:
+    Description: "ARN of the DynamoTable"
+    Value: !GetAtt DynamoTable.Arn
+  DynamoStream:
+    Description: "ARN of DynamoDB Stream"
+    Value: !GetAtt DynamoTable.StreamArn
