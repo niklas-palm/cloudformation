@@ -20,9 +20,17 @@ aws configure
 
 and follow the instructions.
 
-### Console
+## /sam
 
-Simply navigate to CloudFormation in AWS console and create a new stack from a template
+This directory contains templates using AWS SAM - the AWS Serverless Application Model
+
+### Usage
+
+After installing the AWS SAM cli, run
+
+```bash
+sam build && sam deploy --guided
+```
 
 ## Samples
 
