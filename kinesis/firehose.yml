@@ -1,0 +1,24 @@
+AWSTemplateFormatVersion: 2010-09-09
+# Transform: AWS::Serverless-2016-10-31
+
+Description: Cloudformation testing kinesis firehose
+# Metadata:
+
+# Parameters:
+
+# Mappings:
+
+# Conditions:
+
+Resources:
+  s3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      Tags:
+        - Key: Project
+          Value: Firehose
+
+Outputs:
+  S3ARN:
+    Description: ARN of the bucket
+    Value: !GetAtt s3Bucket.Arn
