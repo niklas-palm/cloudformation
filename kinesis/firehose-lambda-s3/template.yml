@@ -81,9 +81,7 @@ Resources:
               - Effect: Allow
                 Action: "*"
                 Resource:
-                  - "*"
-                  # - !Sub "arn:aws:s3:::${s3Bucket}"
-                  # - !Sub "arn:aws:s3:::${s3Bucket}/*"
+                  - "*" # To permissive!
 
   streamProcessFunction:
     Type: AWS::Serverless::Function

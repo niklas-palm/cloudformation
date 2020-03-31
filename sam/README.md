@@ -1,1 +1,0 @@
-## CloudFormation using AWS SAM

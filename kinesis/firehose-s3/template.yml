@@ -1,5 +1,4 @@
 AWSTemplateFormatVersion: 2010-09-09
-Transform: AWS::Serverless-2016-10-31
 
 Description: Cloudformation testing kinesis firehose
 # Metadata:
@@ -47,6 +46,9 @@ Resources:
                 - firehose.amazonaws.com
             Action:
               - "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                "sts:ExternalId": !Ref "AWS::AccountId"
       Policies:
         - PolicyName: root
           PolicyDocument:
@@ -55,9 +57,7 @@ Resources:
               - Effect: Allow
                 Action: "*"
                 Resource:
-                  - "*"
-                  # - !Sub "arn:aws:s3:::${s3Bucket}"
-                  # - !Sub "arn:aws:s3:::${s3Bucket}/*"
+                  - "*" # To permissive!
 
 Outputs:
   S3ARN:

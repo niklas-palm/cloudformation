@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  lambda-sqs
+
+  Sample SAM Template for API gateway -> SQS -> Lambda -> SQS -> Lambda
+
+# Setting global properties
+Globals:
+  # This applies to all AWS::Serverless::Function
+  Function:
+    Timeout: 30
+    Runtime: python3.7
+    Handler: app.lambda_handler
+    Environment:
+      Variables:
+        FIRST_INTERNAL_QUEUE_URL: !Ref FirstInternalQueue
+
+Resources:
+ # ---- LAMBDAS ----
+  # Lambda to consume the input queue and perform initial processing
+  FirstLambda:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: first_lambda/ # Path to lambda function directory
+      Policies: # Which permission do we want to grant the lambda? (for instance to enable usage of boto3)
+        - AmazonSQSFullAccess ## Restrict access here a bit...
+      Events: # trigger Lambda by:
+        SqsEvent:
+          Type: SQS # An even from SQS (BatchSize messages received triggers lambda)
+          Properties:
+            Queue: !GetAtt InputQueue.Arn # This queue
+            BatchSize: 1 # 1 - 10, default: 10
+            Enabled: true
+
+  # Lambda to consume the first internal queue
+  SecondLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: second_lambda/
+      Events:
+        SqsEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt FirstInternalQueue.Arn
+            BatchSize: 1 # 1 - 10, default: 10
+            Enabled: true
+
+  # Lambda to consume from the DeadLetterQueue
+  DeadLetterQueueLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: DLQ_lambda/
+      Events:
+        SqsEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt DeadLetterQueue.Arn
+            BatchSize: 1 # 1 - 10, default: 10
+            Enabled: true
+
+ # ---- QUEUES ----
+
+  # Input queue, to which API Gateway proxies POST requests
+  InputQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 30 # When it's being processed by a lambda, hide this message from other lambdas consuming the queue for x seconds
+      RedrivePolicy: # "Try to process the event {maxReceiveCount} times, if all fail, send to DeadLetterQueue"
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn"
+        maxReceiveCount: 5 % Number of times a message is delivered to the source queue before being moved to the dead-letter queue.
+  
+  # First internal queue, where processed ingested messages are sent to
+  FirstInternalQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 30 # Default is 30
+
+  # Records we couln't process, we send here for analysis.
+  DeadLetterQueue:
+    Type: AWS:SWS:Queue
+      VisibilityTimeout: 30 # Default is 30
+
+ # ---- API GATEWAY ----
+
+  # API Gateway
+  API:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      DefinitionBody:
+        openapi: "3.0.0"
+        paths:
+          "/":
+            post:
+              summary: Post a message to the Queue
+              responses:
+                "200":
+                  description: 200 status response
+                "400":
+                  description: 400 status response
+                "500":
+                  description: 500 status response
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: AWS
+                passthroughBehavior: NEVER
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:sqs:path//"
+                credentials: !GetAtt ApiRole.Arn
+                requestParameters:
+                  integration.request.header.Content-Type: "'application/x-www-form-urlencoded'"
+                requestTemplates:
+                  application/json:
+                    !Sub "Action=SendMessage##\n&QueueUrl=$util.urlEncode('${InputQueue}')##\n\
+                    &MessageBody=$util.urlEncode($input.body)##\n"
+                responses:
+                  "4\\d{2}":
+                    statusCode: 400
+                    responseTemplates:
+                      application/json: >
+                        {
+                          "message": $input.json('$.message')
+                        }
+                  "5\\d{2}":
+                    statusCode: 500
+                    responseTemplates:
+                      application/json: >
+                        {
+                          "message": $input.json('$.message')
+                        }
+                  default: # On success - maybe return an ID here for the client to track?
+                    statusCode: 200
+                    responseTemplates:
+                      application/json: >
+                        {
+                          "message": "Success"
+                        }
+
+ # ---- IAM ----
+
+  # Role for API Gateway to assume to post to the SQS queue
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: AnythingGoes
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "*" # Specify only to post messages to the que as action
+                  # - dynamodb:PutItem
+                Resource:
+                  - "*" #Specify the Queue ARN here to minimize attack surface
+                  # - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Table}"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action:
+              - sts:AssumeRole
+            Condition:
+              StringEquals:
+                "sts:ExternalId": !Ref "AWS::AccountId"
+
+Outputs:
+  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+  PostEndpointApi:
+    Description: "API Gateway endpoint URL for Prod stage for Post Endpoint"
+    Value: !Sub "https://${API}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  FirstLambda:
+    Description: "1st Lambda Function ARN"
+    Value: !GetAtt FirstLambda.Arn
+  SecondLambda:
+    Description: "2nd Lambda Function ARN"
+    Value: !GetAtt SecondLambda.Arn
