@@ -68,7 +68,7 @@ Resources:
       VisibilityTimeout: 30 # When it's being processed by a lambda, hide this message from other lambdas consuming the queue for x seconds
       RedrivePolicy: # "Try to process the event {maxReceiveCount} times, if all fail, send to DeadLetterQueue"
         deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
-        maxReceiveCount: 5 # Number of times a message is delivered to the source queue before being moved to the dead-letter queue.
+        maxReceiveCount: 2 # Number of times a message is delivered to the source queue before being moved to the dead-letter queue.
 
   # First internal queue, where processed ingested messages are sent to
   FirstInternalQueue:

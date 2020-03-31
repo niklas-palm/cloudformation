@@ -9,30 +9,31 @@ client = boto3.client('sqs')
 
 def lambda_handler(event, context):
     print('First lambda')
-    print(event)
-    print('\n')
+    print('processesing {} records'.format(len(event['Records'])))
 
     payloads = []
 
     for record in event['Records']:
-        print(record)
         print(record['body'])
         payload = {}
 
         payload['ApproximateFirstLambdaReceiveTimestamp'] = record['attributes']['ApproximateFirstReceiveTimestamp']
-        payload['body'] = record['body']
-        payload['processed'] = doStuff(record['body'])
-        payloads.append(payload)
 
-    print(payloads)
-    print('\n')
+        # This just passes along original body - not necessary
+        payload['OriginalBody'] = record['body']
+        payload['ProcessedBody'] = doStuff(record['body'])
+        payloads.append(payload)
 
     response = client.send_message(
         QueueUrl=NEXT_QUEUE_URL,
         MessageBody=json.dumps({'Payloads': payloads})
     )
 
-    print(response)
+    if not response['ResponseMetadata']['HTTPStatusCode'] == 200:
+        print('---- ERROR when writing to queue: \n')
+        print(response)
+        raise Exception(
+            'Something went wrong when writing processed records to the queue', response)
 
     return
 
