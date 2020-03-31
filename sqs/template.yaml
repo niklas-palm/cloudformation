@@ -163,9 +163,9 @@ Resources:
                 - apigateway.amazonaws.com
             Action:
               - sts:AssumeRole
-            Condition:
-              StringEquals:
-                "sts:ExternalId": !Ref "AWS::AccountId"
+            # Condition:
+            #   StringEquals:
+            #     "sts:ExternalId": !Ref "AWS::AccountId"
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
