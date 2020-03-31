@@ -4,7 +4,7 @@ This repo contains some CloudFormation samples for creating various architecture
 
 ## Usage
 
-To use the templates in this repo, you can use either the AWS console or the AWS cli.
+To use the templates in this repo, you can use either the AWS cli or the SAM cli.
 
 ### Configure CLI
 
@@ -19,23 +19,3 @@ aws configure
 ```
 
 and follow the instructions.
-
-## /sam
-
-This directory contains templates using AWS SAM - the AWS Serverless Application Model
-
-### Usage
-
-After installing the AWS SAM cli, run
-
-```bash
-sam build && sam deploy --guided
-```
-
-## Samples
-
-All the samples in this repo are using AMIs from Oktober 2019, so manual update of the relevant AMIs in the mappings may be needed.
-
-### /ec2_lb_web
-
-Creates a VPC in two AZs with one public and one private subnet in each, with a loadbalancer directing trafic to an autoscaling group, where at least two instances are running.
