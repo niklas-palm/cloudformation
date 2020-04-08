@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  s3-textract
+
+  Sample SAM Template for s3-textract
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 30
+
+Resources:
+  ExtractTextFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: extract_text/
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket: !Ref TextBucket
+            Events: s3:ObjectCreated:*
+
+  TextBucket:
+    Type: AWS::S3::Bucket
+
+Outputs:
+  ExtractTextFunction:
+    Description: "Hello World Lambda Function ARN"
+    Value: !GetAtt ExtractTextFunction.Arn
+  S3BucketName:
+    Description: "Name of S3 bucket"
+    Value: !Ref TextBucket
