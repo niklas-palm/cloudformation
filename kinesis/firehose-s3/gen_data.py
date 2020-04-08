@@ -3,17 +3,16 @@ import random
 import time
 import json
 
+from datetime import datetime
+
 client = boto3.client('firehose')
 
 
 class data_generator():
     def __init__(self, sectors):
         self.payload = {}
-        # self.sectors = sectors
-        # self.prices =
+
         for sector in sectors:
-            # self.payload['sector'] = sector
-            # self.payload['price'] = random.randint(20, 50)
             self.payload[sector] = random.randint(20, 50)
 
     def get(self):
@@ -32,23 +31,20 @@ if __name__ == "__main__":
     sectors = ['HEALTH_CARE', 'TECH', 'AUTOMMOBILE', 'RETAIL']
     gen = data_generator(sectors)
 
-    # response = client.list_delivery_streams(
-    #     # DeliveryStreamType='DirectPut'
-    # )
-
-    # response = client.describe_delivery_stream(
-    #     DeliveryStreamName='test-firehose-deliveryStream-HYZBR513I76K'
-    # )
-    # print('\n')
-    # print(response)
-    # print('\n')
-
-    for i in range(10):
-        time.sleep(0.2)
+    # for i in range(10):
+    i = 0
+    while True:
+        i += 1
+        time.sleep(60)
         data = gen.gen_payload()
+        now = datetime.now()
+        date = {'date': now.strftime("%d/%m/%Y %H:%M:%S")}
+        temp = data.copy()
+        temp.update(date)
+
         if i % 5 == 0:
-            print(data)
+            print(temp)
         res = client.put_record(
-            DeliveryStreamName='test-firehose-deliveryStream-HYZBR513I76K',
-            Record={'Data': bytes(json.dumps(data) + '\n', 'utf-8')}
+            DeliveryStreamName='firehouse-s3-deliveryStream-U8V0OCL7WIBD',
+            Record={'Data': bytes(json.dumps(temp) + '\n', 'utf-8')}
         )

@@ -27,7 +27,7 @@ Resources:
           IntervalInSeconds: 60
           SizeInMBs: 1 # Mb
         CompressionFormat: UNCOMPRESSED
-        Prefix: test/ # Prefix added to all files coming from the delivery stream. Not required
+        #Prefix: test/ # Prefix added to all files coming from the delivery stream. Not required
         RoleARN: !GetAtt firehoseToS3Role.Arn
         CloudWatchLoggingOptions:
           Enabled: True
@@ -63,3 +63,6 @@ Outputs:
   S3ARN:
     Description: ARN of the bucket
     Value: !GetAtt s3Bucket.Arn
+  DeliveryStream:
+    Description: Name of firehose delivery stream
+    Value: !Ref deliveryStream
