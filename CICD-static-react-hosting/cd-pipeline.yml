@@ -1,0 +1,187 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31 # To use SAM for less verbose CF
+
+Description: 
+  Continuous deployment pipeline
+
+Parameters: 
+  EnvironmentName:
+    Type: String
+    Default: cicd-stack
+    Description: "Environment prefixing resources, tagging resources and for importing resources from other stacks"
+
+  GithubOAuthToken:
+    Type: String
+    Description: "OAuth token for Github"
+
+  GithubBranchName:
+    Type: String
+    Description: "GitHub Branch name"
+
+  GithubRepoOwner:
+    Type: String
+    Description: "GitHub repo owner user-name. Must be owner"
+
+  GithubRepoName:
+    Type: String
+    Description: "GitHub repo name"
+
+  BuildSpecFilePath:
+    Description: Relative BuildSpec file path for build stage. For more information, see https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html
+    Type: String
+    Default: "buildspec.yml"
+
+Resources: 
+  CodePipelineArtifactStoreBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub ${EnvironmentName}-cd-artifacts-bucket
+      Tags:
+        - Key: project
+          Value: !Ref EnvironmentName
+
+  
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub ${EnvironmentName}-cd-pipeline-github
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref CodePipelineArtifactStoreBucket
+      Stages: 
+        - Name: Source
+          Actions:
+            - Name: GithubSourceAction
+              OutputArtifacts:
+                - Name: SourceOutput
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: '1'
+                Provider: GitHub
+              Configuration:
+                Owner: !Ref GithubRepoOwner
+                Repo: !Ref GithubRepoName
+                Branch: !Ref GithubBranchName
+                OAuthToken: !Ref GithubOAuthToken # This is written in plaintext in console. Better to use secrets manager: {{resolve:secretsmanager:MyGitHubSecret:SecretString:token}}
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref BuildProject
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 2
+        - Name: Deploy
+          Actions:
+            - Name: DeployAction
+              InputArtifacts:
+                - Name: BuildOutput
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: S3
+                Version: '1'
+              Configuration:
+                BucketName: 
+                  Fn::ImportValue: !Sub ${EnvironmentName}:webhosting:bucket
+                Extract: true
+              RunOrder: 3
+      Tags:
+        - Key: project
+          Value: !Ref EnvironmentName
+      RestartExecutionOnUpdate: true # Automatically run pipeline after it's been updated.
+
+  CodePipelineServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Sub ${EnvironmentName}-codepipeline-service-role
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: # TODO: SCOPE DOWN!!!
+                  - codedeploy:*
+                  - codebuild:*
+                  - s3:*
+                Resource: '*'
+
+  BuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      ServiceRole: !GetAtt BuildProjectRole.Arn
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Ref BuildSpecFilePath
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL # SMALL | MEDIUM | LARGE
+        Image: 'aws/codebuild/standard:3.0'
+        Type: LINUX_CONTAINER
+        EnvironmentVariables: # Inject env variables into codeBuild (accessible as ${Name} in the buildspec.yml )
+          - Name: HOSTING_BUCKET
+            Value: 
+              Fn::ImportValue: !Sub ${EnvironmentName}:webhosting:bucket
+      Tags:
+        - Key: project
+          Value: !Ref EnvironmentName
+
+  BuildProjectRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Sub ${EnvironmentName}-codebuild-service-role
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: # TODO: SCOPE DOWN!!!
+                  - logs:*
+                  - s3:*
+                Resource: '*'
+
+  GitHubWebhook:
+    Type: 'AWS::CodePipeline::Webhook'
+    Properties:
+      AuthenticationConfiguration:
+        SecretToken: !Ref GithubOAuthToken
+      Filters:
+        - JsonPath: "$.ref"
+          MatchEquals: refs/heads/{Branch}
+      Authentication: GITHUB_HMAC
+      TargetPipeline: !Ref CodePipeline
+      TargetAction: GithubSourceAction
+      TargetPipelineVersion: !GetAtt CodePipeline.Version
+      RegisterWithThirdParty: true
+
+Outputs:
+  CodePipelineArtifactStoreBucket:
+    Description: Bucket used for storing codepieline artifacts
+    Value: !Ref CodePipelineArtifactStoreBucket
