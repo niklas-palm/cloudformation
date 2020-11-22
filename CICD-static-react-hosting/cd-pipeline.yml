@@ -26,6 +26,14 @@ Parameters:
     Type: String
     Description: "GitHub repo name"
 
+  # GithubSecretName:
+  #   Type: String
+  #   Description: "Name of the secret in systems manager"
+
+  # GithubSecretNameKey:
+  #   Type: String
+  #   Description: "Key (in the secret's key-value pair) of the secret itself."
+
   BuildSpecFilePath:
     Description: Relative BuildSpec file path for build stage. For more information, see https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html
     Type: String
@@ -65,6 +73,13 @@ Resources:
                 Repo: !Ref GithubRepoName
                 Branch: !Ref GithubBranchName
                 OAuthToken: !Ref GithubOAuthToken # This is written in plaintext in console. Better to use secrets manager: {{resolve:secretsmanager:MyGitHubSecret:SecretString:token}}
+                # OAuthToken: !Join 
+                #   - ''
+                #   - - '{{resolve:secretsmanager:'
+                #     - !Ref GithubSecretName
+                #     - ':SecretString:'
+                #     - !Ref GithubSecretNameKey
+                #     - '}}'
               RunOrder: 1
         - Name: Build
           Actions:
