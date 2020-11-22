@@ -187,6 +187,13 @@ Resources:
     Properties:
       AuthenticationConfiguration:
         SecretToken: !Ref GithubOAuthToken
+        # SecretToken: !Join 
+        #   - ''
+        #   - - '{{resolve:secretsmanager:'
+        #     - !Ref GithubSecretName
+        #     - ':SecretString:'
+        #     - !Ref GithubSecretNameKey
+        #     - '}}'
       Filters:
         - JsonPath: "$.ref"
           MatchEquals: refs/heads/{Branch}
