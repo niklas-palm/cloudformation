@@ -211,6 +211,7 @@ Resources:
 
           cd ~
           git clone https://github.com/edenhill/kafkacat.git
+          cd kafkacat
           ./kafkacat/bootstrap.sh
 
   MyEIP:
