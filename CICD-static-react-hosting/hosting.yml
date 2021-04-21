@@ -11,11 +11,10 @@ Parameters:
     Description: "Environment prefixing resources, tagging resources and for importing resources from other stacks"
 
 Resources: 
-  s3Bucket: # To host static web assets
+  HostingBucket: # To host static web assets
     Type: AWS::S3::Bucket
     Properties: 
       AccessControl: Private
-      BucketName: !Sub ${EnvironmentName}-web-hosting
       Tags:
         - Key: project
           Value: !Sub ${EnvironmentName}
@@ -24,12 +23,12 @@ Resources:
     Type: 'AWS::CloudFront::CloudFrontOriginAccessIdentity'
     Properties:
       CloudFrontOriginAccessIdentityConfig:
-        Comment: !Ref s3Bucket
+        Comment: !Ref HostingBucket
 
-  s3BucketPolicy: # Bucket policy that allows the aboe OAI to access the buvket.
+  HostingBucketPolicy: # Bucket policy that allows the aboe OAI to access the buvket.
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref s3Bucket
+      Bucket: !Ref HostingBucket
       PolicyDocument:
         Statement:
           - Action:
@@ -39,7 +38,7 @@ Resources:
               - !Join
                 - ''
                 - - 'arn:aws:s3:::'
-                  - !Ref s3Bucket
+                  - !Ref HostingBucket
                   - '/*'
             Principal: 
               AWS: !Join
@@ -76,7 +75,7 @@ Resources:
         HttpVersion: http2
         PriceClass: PriceClass_All
         Origins:
-          - DomainName: !GetAtt s3Bucket.RegionalDomainName
+          - DomainName: !GetAtt HostingBucket.RegionalDomainName
             Id: s3origin
             S3OriginConfig:
               OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}
@@ -92,8 +91,8 @@ Outputs:
   Domain:
     Description: Cloudfront Domain
     Value: !GetAtt cloudfrontDistribution.DomainName
-  s3Bucket:
+  HostingBucket:
     Description: S3 Bucket Name hosting the static website
-    Value: !Ref s3Bucket
+    Value: !Ref HostingBucket
     Export:
       Name: !Sub ${EnvironmentName}:webhosting:bucket
