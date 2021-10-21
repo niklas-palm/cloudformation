@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  parallell-lambda
+
+  Sample SAM Template for parallell-lambda
+  
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 3
+
+Parameters:
+  myKeyPair:
+    Description: Amazon EC2 Key Pair
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: niklaspalm-arn
+  Project:
+    Type: String
+    Default: LambdaScaleTest
+
+
+Resources:
+  LamdaFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: code/
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      MemorySize: 256
+      Tracing: Active
+      Events:
+        HelloWorld:
+          Type: Api  # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /
+            Method: get
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.1.0.0/16
+      EnableDnsSupport: true
+
+  # INTERNET GATEWAY
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # SUBNET
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - "0"
+        - !GetAZs ""
+      VpcId: !Ref VPC
+      CidrBlock: 10.1.0.0/24
+      MapPublicIpOnLaunch: true
+
+  # ROUTES
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: PublicRouteTable
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # SECURITY GROUPS
+  SecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Only allow ssh
+      VpcId:
+        !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  # LAUNCH CONFIG
+  myLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      AssociatePublicIpAddress: true # Since not default subnet, default is false
+      ImageId: ami-050fdc53cf6ba8f7f
+      InstanceMonitoring: true
+      InstanceType: t3.medium
+      KeyName: !Ref myKeyPair
+      SecurityGroups:
+        - !Ref SecGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #cloud-config
+          write_files:
+            - content: |
+                import time
+                from locust import HttpUser, task, between
+
+                class QuickstartUser(HttpUser):
+                    wait_time = between(9, 11)
+
+                    @task
+                    def hello_world(self):
+                        for i in range(10):
+                            self.client.get("/")
+              path: /root/locustfile.py
+          package_upgrade: true
+          packages:
+            - gcc
+            - python3-devel
+          runcmd:
+              - [ pip3, install, --user, locust]
+              - '/root/.local/bin/locust --host "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/" --locustfile /root/locustfile.py --headless --spawn-rate 200 --users 200 &'
+
+
+  #AUTO SCALE GROUP
+  AutoscalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn:
+      - PublicRoute
+    Properties:
+      LaunchConfigurationName: !Ref myLaunchConfig
+      MaxSize: "6"
+      MinSize: "2"
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet
+      Tags:
+        - Key: project
+          Value: !Ref Project
+          PropagateAtLaunch: true
+Outputs:
+  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+  HelloWorldApi:
+    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  LamdaFunction:
+    Description: "Hello World Lambda Function ARN"
+    Value: !GetAtt LamdaFunction.Arn
+  LamdaFunctionIamRole:
+    Description: "Implicit IAM Role created for Hello World function"
+    Value: !GetAtt LamdaFunctionRole.Arn
