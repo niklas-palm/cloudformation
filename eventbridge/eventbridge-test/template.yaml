@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  eventbridge-test
+
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: hello_world
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      Events:
+        HelloWorld:
+          Type: CloudWatchEvent
+          Properties:
+            EventBusName: my-custom-event-bus
+            Pattern:
+              source:
+                - com.mycompany.myapp
+              detail-type:
+                - OrderCreated
+              detail:
+                OrderValue: [ {"numeric": [">", 100]} ]
+
+Outputs:
+  HelloWorldFunction:
+    Description: "Hello World Lambda Function ARN"
+    Value: !GetAtt HelloWorldFunction.Arn
