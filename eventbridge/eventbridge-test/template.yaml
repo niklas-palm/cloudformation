@@ -3,19 +3,44 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   eventbridge-test
 
+Parameters:
+  EventBus:
+    Type: String
+    Default: my-custom-event-bus
+
 Globals:
   Function:
     Timeout: 3
 
 Resources:
-  HelloWorldFunction:
+  PublishEventsLamda:
     Type: AWS::Serverless::Function 
     Properties:
-      CodeUri: hello_world
+      CodeUri: publish_events
       Handler: app.lambda_handler
       Runtime: python3.7
+      Tracing: Active
+      Policies:
+        - EventBridgePutEventsPolicy:
+            EventBusName: !Ref EventBus
       Events:
-        HelloWorld:
+        CWSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: 'rate(1 minute)'
+            Name: TriggerPuchlishLambdaSchedule
+            Description: Trigger Publish event lambda.
+            Enabled: true
+
+  ReceiveEventLambda:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: receive_events
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      Tracing: Active
+      Events:
+        EventBridge:
           Type: CloudWatchEvent
           Properties:
             EventBusName: my-custom-event-bus
@@ -28,6 +53,11 @@ Resources:
                 OrderValue: [ {"numeric": [">", 100]} ]
 
 Outputs:
-  HelloWorldFunction:
-    Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
+  ReceiveEventLambda:
+    Description: "ReceiveEventLambda ARN"
+    Value: !GetAtt ReceiveEventLambda.Arn
+  PublishEventsLamda:
+    Description: "PublishEventsLamda ARN"
+    Value: !GetAtt PublishEventsLamda.Arn
+
+    
