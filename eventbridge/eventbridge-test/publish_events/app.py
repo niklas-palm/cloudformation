@@ -14,6 +14,7 @@ logger.setLevel(logging.INFO)
 
 
 def lambda_handler(event, context):
+
     events = [
         {
             "Source": "com.mycompany.myapp",
@@ -37,6 +38,12 @@ def lambda_handler(event, context):
             "Source": "com.mycompany.myapp",
             "DetailType": "OrderCreated",
             "Detail": "{\"OrderValue\": 100000, \"OtherInfo\": \"Wow\"}",
+            "EventBusName": "my-custom-event-bus"
+        },
+        {
+            "Source": "com.mycompany.myapp",
+            "DetailType": "OrderCanceled",
+            "Detail": "{\"OrderValue\": 100000, \"OtherInfo\": \"Cancelled orde because why not\"}",
             "EventBusName": "my-custom-event-bus"
         }
     ]

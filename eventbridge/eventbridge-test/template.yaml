@@ -32,10 +32,30 @@ Resources:
             Description: Trigger Publish event lambda.
             Enabled: true
 
-  ReceiveEventLambda:
+  LargeOrderEventLambda:
     Type: AWS::Serverless::Function 
     Properties:
-      CodeUri: receive_events
+      CodeUri: large_order
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      Tracing: Active
+      Events:
+        EventBridge:
+          Type: CloudWatchEvent
+          Properties:
+            EventBusName: my-custom-event-bus
+            Pattern:
+              source:
+                - com.mycompany.myapp
+              detail-type:
+                - OrderCreated
+              detail:
+                OrderValue: [ {"numeric": ["<", 100]} ]
+
+  SmallOrderEventLambda:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: small_order
       Handler: app.lambda_handler
       Runtime: python3.7
       Tracing: Active
@@ -52,10 +72,34 @@ Resources:
               detail:
                 OrderValue: [ {"numeric": [">", 100]} ]
 
+  CancelOrderEventLambda:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: cancel_order
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      Tracing: Active
+      Events:
+        EventBridge:
+          Type: CloudWatchEvent
+          Properties:
+            EventBusName: my-custom-event-bus
+            Pattern:
+              source:
+                - com.mycompany.myapp
+              detail-type:
+                - OrderCanceled
+
 Outputs:
-  ReceiveEventLambda:
-    Description: "ReceiveEventLambda ARN"
-    Value: !GetAtt ReceiveEventLambda.Arn
+  LargeOrderEventLambda:
+    Description: "LargeOrderEventLambda ARN"
+    Value: !GetAtt LargeOrderEventLambda.Arn
+  SmallOrderEventLambda:
+    Description: "SmallOrderEventLambda ARN"
+    Value: !GetAtt SmallOrderEventLambda.Arn
+  CancelOrderEventLambda:
+    Description: "CancelOrderEventLambda ARN"
+    Value: !GetAtt CancelOrderEventLambda.Arn
   PublishEventsLamda:
     Description: "PublishEventsLamda ARN"
     Value: !GetAtt PublishEventsLamda.Arn
