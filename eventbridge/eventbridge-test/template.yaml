@@ -11,6 +11,9 @@ Parameters:
 Globals:
   Function:
     Timeout: 3
+    Environment:
+      Variables:
+        EVENT_BUS: !Ref EventBus
 
 Resources:
   PublishEventsLamda:

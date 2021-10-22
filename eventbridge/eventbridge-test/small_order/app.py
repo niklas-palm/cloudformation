@@ -1,6 +1,7 @@
 
 import logging
 import random
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
