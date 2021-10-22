@@ -1,5 +1,6 @@
 import boto3
 import logging
+import random
 
 from aws_xray_sdk.core import xray_recorder
 from aws_xray_sdk.core import patch_all
@@ -51,7 +52,7 @@ def lambda_handler(event, context):
     logger.info('### Putting events')
 
     response = client.put_events(
-        Entries=events
+        Entries=[random.choice(events)]
     )
 
     logger.info('### Response')
