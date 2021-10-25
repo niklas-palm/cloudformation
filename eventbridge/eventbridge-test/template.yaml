@@ -3,19 +3,20 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   eventbridge-test
 
-Parameters:
-  EventBus:
-    Type: String
-    Default: my-custom-event-bus
-
 Globals:
   Function:
     Timeout: 3
     Environment:
       Variables:
-        EVENT_BUS: !Ref EventBus
+        EVENT_BUS: !Ref CustomEventBus
 
 Resources:
+
+  CustomEventBus:
+    Type: AWS::Events::EventBus
+    Properties: 
+      Name: my-event-bus
+
   PublishEventsLamda:
     Type: AWS::Serverless::Function 
     Properties:
@@ -25,7 +26,7 @@ Resources:
       Tracing: Active
       Policies:
         - EventBridgePutEventsPolicy:
-            EventBusName: !Ref EventBus
+            EventBusName: !Ref CustomEventBus
       Events:
         CWSchedule:
           Type: Schedule
@@ -46,7 +47,7 @@ Resources:
         EventBridge:
           Type: CloudWatchEvent
           Properties:
-            EventBusName: my-custom-event-bus
+            EventBusName: !Ref CustomEventBus
             Pattern:
               source:
                 - com.mycompany.myapp
@@ -66,7 +67,7 @@ Resources:
         EventBridge:
           Type: CloudWatchEvent
           Properties:
-            EventBusName: my-custom-event-bus
+            EventBusName: !Ref CustomEventBus
             Pattern:
               source:
                 - com.mycompany.myapp
@@ -86,7 +87,7 @@ Resources:
         EventBridge:
           Type: CloudWatchEvent
           Properties:
-            EventBusName: my-custom-event-bus
+            EventBusName: !Ref CustomEventBus
             Pattern:
               source:
                 - com.mycompany.myapp
@@ -106,5 +107,8 @@ Outputs:
   PublishEventsLamda:
     Description: "PublishEventsLamda ARN"
     Value: !GetAtt PublishEventsLamda.Arn
+  CustomEventBus:
+    Description: CustomEventBus
+    Value: !Ref CustomEventBus
 
     
