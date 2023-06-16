@@ -1,0 +1,242 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Simple Node webserver with express, running on an EC2.
+
+Resources:
+  # VPC
+  myVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.99.0.0/16
+      EnableDnsSupport: true
+      Tags:
+        - Key: project
+          Value: nodeserver-demo
+
+  # INTERNET GATEWAY
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: project
+          Value: nodeserver-demo
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref myVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # SUBNETS
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - "0"
+        - !GetAZs ""
+      VpcId: !Ref myVPC
+      CidrBlock: 10.99.0.0/24
+      Tags:
+        - Key: project
+          Value: nodeserver-demo
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - "1"
+        - !GetAZs ""
+      VpcId: !Ref myVPC
+      CidrBlock: 10.99.1.0/24
+      Tags:
+        - Key: project
+          Value: nodeserver-demo
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: PublicRouteTable
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  ALBSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Accepts incoming traffic on port 80
+      VpcId: !Ref myVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  WebServerSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Accepts incoming traffic on port 80
+      VpcId: !Ref myVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          # CidrIp: 0.0.0.0/0
+          SourceSecurityGroupId: !GetAtt ALBSecGroup.GroupId
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Description
+          Value: Only accept traffic from ALB and SSH
+
+  EC2WebServerRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+
+  # NOTA BENE - you should probably restrict this...?
+  RolePolicies:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "root"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action: "*"
+            Resource: "*"
+      Roles:
+        - Ref: "EC2WebServerRole"
+
+  EC2InstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+        - Ref: "EC2WebServerRole"
+
+  # LAUNCH CONFIG
+  myLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      AssociatePublicIpAddress: true # Since not default subnet, default is false
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      ImageId: ami-079d9017cb651564d
+      InstanceMonitoring: true
+      InstanceType: t2.micro
+      KeyName: niklaspalm-misc
+      SecurityGroups:
+        - !Ref WebServerSecGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          sudo yum update -y
+          sudo yum install git -y
+          sudo yum install curl -y
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+          . ~/.nvm/nvm.sh
+          nvm install 16
+          npm install -g pm2
+          git clone https://github.com/niklas-palm/simple-express-server.git
+          cd simple-express-server
+          npm install
+          pm2 start index.js
+
+  # LOAD BALANCER
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Scheme: internet-facing
+      SecurityGroups:
+        - !GetAtt ALBSecGroup.GroupId
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      Tags:
+        - Key: Name
+          Value: internet-facing-ALB
+
+  # LISTERNER for ALB
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      # Certificates:
+      #   - Certificate
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref myTargetGroup
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+      # SslPolicy: String
+
+  # TARGET GROUP
+  myTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckPath: /health # This is also the default path for the health ping
+      HealthCheckProtocol: HTTP # This is default
+      Matcher:
+        HttpCode: 200
+      Protocol: HTTP
+      Port: 8080
+      TargetType: instance
+      VpcId: !Ref myVPC
+
+  #AUTO SCALE GROUP
+  myAutoscalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn:
+      - PublicRoute
+    Properties:
+      LaunchConfigurationName: !Ref myLaunchConfig
+      MaxSize: 6
+      MinSize: 1
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      TargetGroupARNs:
+        - !Ref myTargetGroup
+      Tags:
+        - Key: Name
+          Value: express-webserver-demo
+          PropagateAtLaunch: true
+
+Outputs:
+  WebServerIP:
+    Description: EIP of webserver
+    Value: !Ref MyEIP
+  ALBDNS:
+    Description: The Public DNS for the ALB
+    Value: !GetAtt ALB.DNSName
